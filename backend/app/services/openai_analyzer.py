@@ -10,9 +10,11 @@ import openai
 from app.config import settings
 from app.core.constants import HANGUP_CAUSES, SMS_ERROR_CODES, SUCCESS_HANGUP_CODES, SMS_SUCCESS_CODES
 from app.core.exceptions import AIAnalysisError
-from app.models.analysis import AnalysisIssue, AnalysisResult, ChartData
+from app.models.analysis import AnalysisIssue, AnalysisResult, ChartData, TrendInfo
 from app.models.cdr import CDRRecord
 from app.models.mdr import MDRRecord
+from app.services.health_score import compute_health_score
+from app.services.trend_detection import detect_trend
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +121,24 @@ def _aggregate_mdr_logs(records: list[MDRRecord]) -> dict:
     }
 
 
+def _compute_extras(aggregated: dict) -> tuple:
+    """Compute health score/grade and trend from aggregated data."""
+    daily_stats = aggregated["daily_stats"]
+    daily_rates = list(daily_stats.values())
+
+    # Daily error rates = 100 - success_rate for each day
+    daily_error_rates = [100.0 - r for r in daily_rates]
+
+    unique_error_count = len(aggregated["top_errors"])
+    health_score, health_grade = compute_health_score(
+        aggregated["success_rate"], unique_error_count, daily_error_rates
+    )
+    trend_result = detect_trend(daily_error_rates)
+    trend_info = TrendInfo(**trend_result)
+
+    return health_score, health_grade, trend_info
+
+
 def _build_mock_result(aggregated: dict) -> AnalysisResult:
     """Generate a mock analysis result without calling OpenAI."""
     log_type = aggregated["log_type"]
@@ -161,6 +181,8 @@ def _build_mock_result(aggregated: dict) -> AnalysisResult:
     dates = list(aggregated["daily_stats"].keys())
     date_range = f"{dates[0]} to {dates[-1]}" if dates else "N/A"
 
+    health_score, health_grade, trend_info = _compute_extras(aggregated)
+
     return AnalysisResult(
         summary=f"Analysis of {aggregated['total_records']} {log_type} records shows a {aggregated['success_rate']}% success rate. "
         f"Found {len(issues)} issue(s) requiring attention. "
@@ -174,6 +196,9 @@ def _build_mock_result(aggregated: dict) -> AnalysisResult:
         success_rate=aggregated["success_rate"],
         date_range=date_range,
         log_type=log_type,
+        health_score=health_score,
+        health_grade=health_grade,
+        trend=trend_info,
     )
 
 
@@ -246,6 +271,8 @@ async def analyze_logs(
         dates = list(aggregated["daily_stats"].keys())
         date_range = f"{dates[0]} to {dates[-1]}" if dates else "N/A"
 
+        health_score, health_grade, trend_info = _compute_extras(aggregated)
+
         return AnalysisResult(
             summary=parsed.get("summary", "Analysis complete."),
             issues=issues,
@@ -254,6 +281,9 @@ async def analyze_logs(
             success_rate=aggregated["success_rate"],
             date_range=date_range,
             log_type=log_type,
+            health_score=health_score,
+            health_grade=health_grade,
+            trend=trend_info,
         )
     except (openai.APIError, json.JSONDecodeError, KeyError) as e:
         logger.error(f"OpenAI API call failed: {e}. Falling back to mock analysis.")

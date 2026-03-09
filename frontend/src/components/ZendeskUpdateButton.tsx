@@ -37,7 +37,7 @@ export default function ZendeskUpdateButton({
   return (
     <div className="card p-5 space-y-3">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-[var(--radius-md)] bg-gray-50 border border-card-border flex items-center justify-center text-text-muted">
+        <div className="w-9 h-9 rounded-[var(--radius-md)] bg-hover-bg border border-card-border flex items-center justify-center text-text-muted">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
             <polyline points="22,6 12,13 2,6" />
@@ -55,7 +55,7 @@ export default function ZendeskUpdateButton({
           value={ticketId}
           onChange={(e) => setTicketId(e.target.value)}
           placeholder="Ticket ID (e.g. 12345)"
-          className="flex-1 rounded-[var(--radius-md)] border border-card-border bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-foreground transition-all placeholder:text-text-muted"
+          className="flex-1 rounded-[var(--radius-md)] border border-card-border bg-input-bg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-foreground transition-all placeholder:text-text-muted"
         />
         <button
           onClick={handleUpdate}

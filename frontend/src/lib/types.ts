@@ -25,6 +25,13 @@ export interface ChartData {
   success_rate_over_time: Array<{ date: string; rate: number }>;
 }
 
+export interface TrendInfo {
+  direction: "stable" | "increasing" | "decreasing";
+  slope: number;
+  confidence: "high" | "medium" | "low";
+  description: string;
+}
+
 export interface AnalysisResult {
   summary: string;
   issues: AnalysisIssue[];
@@ -33,6 +40,9 @@ export interface AnalysisResult {
   success_rate: number;
   date_range: string;
   log_type: string;
+  health_score: number;
+  health_grade: string;
+  trend: TrendInfo | null;
 }
 
 export interface AnalysisStatusResponse {
@@ -62,3 +72,8 @@ export interface UpdateZendeskResponse {
 }
 
 export type WorkflowPhase = "form" | "processing" | "results";
+
+export interface DrilldownFilter {
+  type: "error" | "date";
+  value: string;
+}

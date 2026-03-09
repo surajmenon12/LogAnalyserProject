@@ -1,0 +1,46 @@
+There are three mocked systems to replace:
+
+  1. OpenAI Analysis
+
+  Easiest — just needs an API key.
+  - Get an API key from https://platform.openai.com
+  - Set in backend/.env:
+  OPENAI_API_KEY=sk-your-real-key
+  MOCK_AI=false
+  - The code already has the real OpenAI integration in openai_analyzer.py — it falls back to mock only when MOCK_AI=true
+
+  2. Redshift (Real CDR/MDR Logs)
+
+  Biggest change — requires database access.
+  - Install a Redshift driver: add redshift-connector or sqlalchemy-redshift + psycopg2-binary to requirements.txt
+  - Rewrite backend/app/services/mock_redshift.py to:
+    - Connect to your Plivo Redshift cluster
+    - Query the actual CDR/MDR tables using the auth_id, from_date, to_date parameters
+    - Map query results to the existing CDRRecord / MDRRecord Pydantic models
+  - Add connection config to backend/app/config.py:
+  REDSHIFT_HOST: str = ""
+  REDSHIFT_PORT: int = 5439
+  REDSHIFT_DB: str = ""
+  REDSHIFT_USER: str = ""
+  REDSHIFT_PASSWORD: str = ""
+  - The rest of the pipeline (aggregation, OpenAI analysis, frontend) stays unchanged since it all works off the CDRRecord/MDRRecord
+  models
+
+  3. Zendesk Integration
+
+  Moderate — needs API credentials and HTTP calls.
+  - Get a Zendesk API token from your Zendesk admin panel
+  - Add to backend/app/config.py:
+  ZENDESK_SUBDOMAIN: str = ""
+  ZENDESK_EMAIL: str = ""
+  ZENDESK_API_TOKEN: str = ""
+  - Rewrite backend/app/services/mock_zendesk.py to make real HTTP calls:
+  PUT https://{subdomain}.zendesk.com/api/v2/tickets/{ticket_id}
+  - with the analysis summary as an internal note
+  - Use httpx (already installed as an openai dependency) for async HTTP requests
+
+  Recommended Order
+
+  1. OpenAI (5 minutes — just flip a flag)
+  2. Zendesk (a few hours — straightforward REST API)
+  3. Redshift (most effort — needs DB access, correct table schemas, query tuning)

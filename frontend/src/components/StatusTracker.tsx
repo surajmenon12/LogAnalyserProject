@@ -89,7 +89,7 @@ export default function StatusTracker({ status, progressPct, message }: StatusTr
                       ? "bg-success text-white"
                       : isCurrent
                       ? "bg-primary text-white animate-glow"
-                      : "bg-gray-100 text-text-muted border-2 border-card-border"
+                      : "bg-muted-bg text-text-muted border-2 border-card-border"
                   }`}
                 >
                   {isCompleted ? (
@@ -118,7 +118,7 @@ export default function StatusTracker({ status, progressPct, message }: StatusTr
             <span className="text-xs text-text-secondary font-medium">Progress</span>
             <span className="text-xs font-semibold text-foreground">{progressPct}%</span>
           </div>
-          <div className="w-full bg-gray-100 rounded-full h-2">
+          <div className="w-full bg-muted-bg rounded-full h-2">
             <div
               className="progress-bar-animated h-2 rounded-full transition-all duration-700 ease-out"
               style={{ width: `${progressPct}%` }}

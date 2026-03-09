@@ -1,17 +1,23 @@
 "use client";
 
+import { useState } from "react";
 import { useAnalysis } from "@/hooks/useAnalysis";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
+import { useTheme } from "@/hooks/useTheme";
+import { useChartColors } from "@/hooks/useChartColors";
 import Sidebar from "@/components/Sidebar";
 import AnalysisForm from "@/components/AnalysisForm";
 import StatusTracker from "@/components/StatusTracker";
 import AISummaryCard from "@/components/AISummaryCard";
 import ErrorDistributionChart from "@/components/ErrorDistributionChart";
 import SuccessRateChart from "@/components/SuccessRateChart";
-import RawLogsDownload from "@/components/RawLogsDownload";
+import LogTable from "@/components/LogTable";
 import ZendeskUpdateButton from "@/components/ZendeskUpdateButton";
+import HealthGradeCard from "@/components/HealthGradeCard";
+import PdfReportExport from "@/components/PdfReportExport";
 import PrivacyBanner from "@/components/PrivacyBanner";
 import SessionTimeoutModal from "@/components/SessionTimeoutModal";
+import type { DrilldownFilter } from "@/lib/types";
 
 function getHeaderContent(phase: string): { title: string; subtitle: string; breadcrumb: string } {
   switch (phase) {
@@ -31,6 +37,23 @@ export default function Home() {
   } = useAnalysis();
   const { showModal, handleTimeout } = useSessionTimeout(phase !== "form");
   const { title, subtitle, breadcrumb } = getHeaderContent(phase);
+  const { isDark, toggle } = useTheme();
+  const chartColors = useChartColors(isDark);
+
+  // Drill-down state
+  const [drilldownFilter, setDrilldownFilter] = useState<DrilldownFilter | null>(null);
+
+  const handleBarClick = (error: string) => {
+    setDrilldownFilter({ type: "error", value: error });
+  };
+
+  const handleDotClick = (date: string) => {
+    setDrilldownFilter({ type: "date", value: date });
+  };
+
+  const clearDrilldown = () => {
+    setDrilldownFilter(null);
+  };
 
   return (
     <div className="flex min-h-screen">
@@ -39,9 +62,11 @@ export default function Home() {
         hasResults={hasResults}
         onNewAnalysis={goToForm}
         onDashboard={goToDashboard}
+        isDark={isDark}
+        onToggleTheme={toggle}
       />
 
-      <main className="flex-1 lg:ml-60">
+      <main className="flex-1 lg:ml-60 min-w-0 overflow-x-hidden">
         {/* Header */}
         <header className="sticky top-0 z-30 bg-card-bg/80 backdrop-blur-md border-b border-card-border">
           <div className="px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -100,37 +125,51 @@ export default function Home() {
 
           {phase === "results" && statusData?.result && (
             <>
+              <HealthGradeCard
+                score={statusData.result.health_score}
+                grade={statusData.result.health_grade}
+              >
+                <PdfReportExport result={statusData.result} />
+              </HealthGradeCard>
+
               <AISummaryCard result={statusData.result} />
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <ErrorDistributionChart
                   data={statusData.result.chart_data.error_distribution}
+                  chartColors={chartColors}
+                  onBarClick={handleBarClick}
+                  activeError={drilldownFilter?.type === "error" ? drilldownFilter.value : null}
                 />
                 <SuccessRateChart
                   data={statusData.result.chart_data.success_rate_over_time}
+                  chartColors={chartColors}
+                  trend={statusData.result.trend}
+                  onDotClick={handleDotClick}
+                  activeDate={drilldownFilter?.type === "date" ? drilldownFilter.value : null}
                 />
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {statusData.raw_logs && (
-                  <RawLogsDownload
-                    logs={statusData.raw_logs}
-                    logType={statusData.result.log_type}
-                  />
-                )}
+              {statusData.raw_logs && (
+                <LogTable
+                  logs={statusData.raw_logs}
+                  logType={statusData.result.log_type}
+                  drilldownFilter={drilldownFilter}
+                  onClearDrilldown={clearDrilldown}
+                />
+              )}
 
-                {analysisId && (
-                  <ZendeskUpdateButton
-                    analysisId={analysisId}
-                    summary={statusData.result.summary}
-                  />
-                )}
-              </div>
+              {analysisId && (
+                <ZendeskUpdateButton
+                  analysisId={analysisId}
+                  summary={statusData.result.summary}
+                />
+              )}
 
               <div className="text-center pt-2">
                 <button
                   onClick={goToForm}
-                  className="px-6 py-2.5 text-sm font-medium text-text-secondary bg-card-bg border border-card-border rounded-[var(--radius-md)] shadow-sm hover:bg-gray-50 hover:shadow-hover transition-all"
+                  className="px-6 py-2.5 text-sm font-medium text-text-secondary bg-card-bg border border-card-border rounded-[var(--radius-md)] shadow-sm hover:bg-hover-bg hover:shadow-hover transition-all"
                 >
                   Start New Analysis
                 </button>

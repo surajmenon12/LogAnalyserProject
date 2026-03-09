@@ -13,7 +13,7 @@ export default function RawLogsDownload({ logs, logType }: RawLogsDownloadProps)
   return (
     <div className="card p-5 flex flex-col gap-3">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-[var(--radius-md)] bg-gray-50 border border-card-border flex items-center justify-center text-text-muted">
+        <div className="w-9 h-9 rounded-[var(--radius-md)] bg-hover-bg border border-card-border flex items-center justify-center text-text-muted">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
@@ -29,7 +29,7 @@ export default function RawLogsDownload({ logs, logType }: RawLogsDownloadProps)
       <div className="flex gap-2">
         <button
           onClick={() => downloadCSV(logs, `${filename}.csv`)}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-text-secondary bg-white border border-card-border rounded-[var(--radius-md)] shadow-sm hover:bg-gray-50 hover:shadow-hover transition-all"
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-text-secondary bg-input-bg border border-card-border rounded-[var(--radius-md)] shadow-sm hover:bg-hover-bg hover:shadow-hover transition-all"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -40,7 +40,7 @@ export default function RawLogsDownload({ logs, logType }: RawLogsDownloadProps)
         </button>
         <button
           onClick={() => downloadJSON(logs, `${filename}.json`)}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-text-secondary bg-white border border-card-border rounded-[var(--radius-md)] shadow-sm hover:bg-gray-50 hover:shadow-hover transition-all"
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-text-secondary bg-input-bg border border-card-border rounded-[var(--radius-md)] shadow-sm hover:bg-hover-bg hover:shadow-hover transition-all"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />

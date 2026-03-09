@@ -11,19 +11,19 @@ const severityConfig: Record<string, { card: string; badge: string; text: string
   critical: {
     card: "bg-danger-light border-danger/20",
     badge: "bg-danger text-white",
-    text: "text-red-700",
+    text: "text-red-700 dark:text-red-300",
     icon: "text-danger",
   },
   warning: {
     card: "bg-warning-light border-warning/20",
     badge: "bg-warning text-white",
-    text: "text-amber-800",
+    text: "text-amber-800 dark:text-amber-300",
     icon: "text-warning",
   },
   info: {
-    card: "bg-info-light border-blue-200",
+    card: "bg-info-light border-blue-200 dark:border-blue-800",
     badge: "bg-info text-white",
-    text: "text-blue-700",
+    text: "text-blue-700 dark:text-blue-300",
     icon: "text-info",
   },
 };
@@ -32,7 +32,7 @@ export default function AISummaryCard({ result }: AISummaryCardProps) {
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
   return (
-    <div className="card p-6 space-y-5">
+    <div className="card p-6 space-y-5 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
@@ -42,7 +42,7 @@ export default function AISummaryCard({ result }: AISummaryCardProps) {
           </span>
         </div>
         <div className="flex gap-2 text-xs">
-          <span className="bg-gray-50 border border-card-border text-text-secondary px-2.5 py-1 rounded-full font-medium">
+          <span className="bg-hover-bg border border-card-border text-text-secondary px-2.5 py-1 rounded-full font-medium">
             {result.total_records.toLocaleString()} records
           </span>
           <span className="bg-success-light border border-success/20 text-success px-2.5 py-1 rounded-full font-medium">
@@ -84,7 +84,7 @@ export default function AISummaryCard({ result }: AISummaryCardProps) {
                     {issue.title}
                   </span>
                   {issue.affected_records > 0 && result.total_records > 0 && (
-                    <span className="text-[11px] text-text-muted bg-white/60 px-1.5 py-0.5 rounded font-medium">
+                    <span className="text-[11px] text-text-muted bg-input-bg/60 px-1.5 py-0.5 rounded font-medium">
                       {((issue.affected_records / result.total_records) * 100).toFixed(1)}% affected
                     </span>
                   )}
@@ -112,7 +112,7 @@ export default function AISummaryCard({ result }: AISummaryCardProps) {
                   <div className="flex gap-4 text-[12px]">
                     <span><span className="font-semibold">Affected:</span> {issue.affected_records.toLocaleString()} records</span>
                   </div>
-                  <div className="bg-white/40 rounded-[var(--radius-sm)] p-2.5">
+                  <div className="bg-input-bg/40 rounded-[var(--radius-sm)] p-2.5">
                     <p className="text-[12px]"><span className="font-semibold">Recommendation:</span> {issue.recommendation}</p>
                   </div>
                 </div>
