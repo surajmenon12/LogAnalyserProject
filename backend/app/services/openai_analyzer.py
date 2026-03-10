@@ -8,7 +8,11 @@ from typing import Dict, List, Union
 import openai
 
 from app.config import settings
-from app.core.constants import HANGUP_CAUSES, SMS_ERROR_CODES, SUCCESS_HANGUP_CODES, SMS_SUCCESS_CODES, ZENTRUNK_ERROR_CODES, ZENTRUNK_SUCCESS_CODES
+from app.core.constants import (
+    DLR_SUCCESS_CODES,
+    SUCCESS_HANGUP_CODES,
+    ZENTRUNK_SUCCESS_CAUSES,
+)
 from app.core.exceptions import AIAnalysisError
 from app.models.analysis import AnalysisIssue, AnalysisResult, ChartData, TrendInfo
 from app.models.cdr import CDRRecord
@@ -20,39 +24,53 @@ from app.services.trend_detection import detect_trend
 logger = logging.getLogger(__name__)
 
 
+# ===================================================================
+# CDR aggregation — uses base.cdr_raw_airflow column names
+# ===================================================================
+
 def _aggregate_cdr_logs(records: list[CDRRecord]) -> dict:
     total = len(records)
-    successful = sum(1 for r in records if r.hangup_cause_code in SUCCESS_HANGUP_CODES)
-    error_counter = Counter(
-        f"{r.hangup_cause_code} - {r.hangup_cause}"
-        for r in records
-        if r.hangup_cause_code not in SUCCESS_HANGUP_CODES
+    successful = sum(
+        1 for r in records if r.plivo_hangup_cause_code in SUCCESS_HANGUP_CODES
     )
-    carrier_counter = Counter(r.carrier for r in records)
-    region_counter = Counter(r.region for r in records)
+    # Error distribution by plivo_hangup_cause_code + plivo_hangup_cause_name
+    error_counter = Counter(
+        f"{r.plivo_hangup_cause_code} - {r.plivo_hangup_cause_name}"
+        for r in records
+        if r.plivo_hangup_cause_code not in SUCCESS_HANGUP_CODES
+    )
+    carrier_counter = Counter(r.carrier_name for r in records)
+    country_counter = Counter(r.country_iso for r in records)
+    hangup_source_counter = Counter(
+        r.plivo_hangup_source for r in records
+        if r.plivo_hangup_cause_code not in SUCCESS_HANGUP_CODES
+    )
 
-    # Aggregate by date for success rate over time
+    # Aggregate by date for success rate over time (keyed by start_time)
     date_stats: dict[str, dict] = {}
     for r in records:
-        date = r.initiation_time[:10]
+        date = r.start_time[:10]
         if date not in date_stats:
             date_stats[date] = {"total": 0, "success": 0}
         date_stats[date]["total"] += 1
-        if r.hangup_cause_code in SUCCESS_HANGUP_CODES:
+        if r.plivo_hangup_cause_code in SUCCESS_HANGUP_CODES:
             date_stats[date]["success"] += 1
 
-    # Sample failed records (up to 5)
     failed_samples = [
         {
             "call_uuid": r.call_uuid,
-            "hangup_cause_code": r.hangup_cause_code,
+            "plivo_hangup_cause_code": r.plivo_hangup_cause_code,
+            "plivo_hangup_cause_name": r.plivo_hangup_cause_name,
             "hangup_cause": r.hangup_cause,
-            "carrier": r.carrier,
-            "region": r.region,
-            "sip_response_code": r.sip_response_code,
+            "plivo_hangup_source": r.plivo_hangup_source,
+            "carrier_name": r.carrier_name,
+            "country_iso": r.country_iso,
+            "call_state": r.call_state,
+            "bill_duration": r.bill_duration,
+            "post_dial_delay": r.post_dial_delay,
         }
         for r in records
-        if r.hangup_cause_code not in SUCCESS_HANGUP_CODES
+        if r.plivo_hangup_cause_code not in SUCCESS_HANGUP_CODES
     ][:5]
 
     return {
@@ -63,7 +81,8 @@ def _aggregate_cdr_logs(records: list[CDRRecord]) -> dict:
         "success_rate": round(successful / total * 100, 2) if total > 0 else 0,
         "top_errors": dict(error_counter.most_common(10)),
         "carrier_distribution": dict(carrier_counter.most_common(10)),
-        "region_distribution": dict(region_counter.most_common(10)),
+        "country_distribution": dict(country_counter.most_common(10)),
+        "hangup_source_distribution": dict(hangup_source_counter.most_common(5)),
         "daily_stats": {
             date: round(s["success"] / s["total"] * 100, 2) if s["total"] > 0 else 0
             for date, s in sorted(date_stats.items())
@@ -72,37 +91,47 @@ def _aggregate_cdr_logs(records: list[CDRRecord]) -> dict:
     }
 
 
+# ===================================================================
+# MDR aggregation — uses base.mdr_raw_airflow column names
+# ===================================================================
+
 def _aggregate_mdr_logs(records: list[MDRRecord]) -> dict:
     total = len(records)
-    successful = sum(1 for r in records if r.status == "delivered")
+    successful = sum(1 for r in records if r.message_state == "delivered")
+    # Error distribution by dlr_error code
     error_counter = Counter(
-        f"{r.error_code} - {r.error_message}"
+        f"{r.dlr_error} - {r.message_state}"
         for r in records
-        if r.error_code is not None and r.error_code not in SMS_SUCCESS_CODES
+        if r.dlr_error not in DLR_SUCCESS_CODES
     )
-    carrier_counter = Counter(r.carrier for r in records)
-    region_counter = Counter(r.region for r in records)
+    carrier_counter = Counter(r.carrier_name for r in records)
+    country_counter = Counter(r.country_iso for r in records)
+    number_type_counter = Counter(
+        r.number_type for r in records if r.number_type
+    )
 
+    # Aggregate by date (keyed by message_time)
     date_stats: dict[str, dict] = {}
     for r in records:
-        date = r.sent_time[:10]
+        date = r.message_time[:10]
         if date not in date_stats:
             date_stats[date] = {"total": 0, "success": 0}
         date_stats[date]["total"] += 1
-        if r.status == "delivered":
+        if r.message_state == "delivered":
             date_stats[date]["success"] += 1
 
     failed_samples = [
         {
             "message_uuid": r.message_uuid,
-            "error_code": r.error_code,
-            "error_message": r.error_message,
-            "carrier": r.carrier,
-            "region": r.region,
-            "status": r.status,
+            "dlr_error": r.dlr_error,
+            "message_state": r.message_state,
+            "carrier_name": r.carrier_name,
+            "country_iso": r.country_iso,
+            "number_type": r.number_type,
+            "message_type": r.message_type,
         }
         for r in records
-        if r.status in ("failed", "undelivered")
+        if r.message_state in ("failed", "undelivered")
     ][:5]
 
     return {
@@ -113,7 +142,8 @@ def _aggregate_mdr_logs(records: list[MDRRecord]) -> dict:
         "success_rate": round(successful / total * 100, 2) if total > 0 else 0,
         "top_errors": dict(error_counter.most_common(10)),
         "carrier_distribution": dict(carrier_counter.most_common(10)),
-        "region_distribution": dict(region_counter.most_common(10)),
+        "country_distribution": dict(country_counter.most_common(10)),
+        "number_type_distribution": dict(number_type_counter.most_common(5)),
         "daily_stats": {
             date: round(s["success"] / s["total"] * 100, 2) if s["total"] > 0 else 0
             for date, s in sorted(date_stats.items())
@@ -122,42 +152,55 @@ def _aggregate_mdr_logs(records: list[MDRRecord]) -> dict:
     }
 
 
+# ===================================================================
+# Zentrunk aggregation — uses base.zentrunk_cdr_raw column names
+# ===================================================================
+
 def _aggregate_zentrunk_logs(records: list[ZentrunkRecord]) -> dict:
     total = len(records)
-    successful = sum(1 for r in records if r.status == "completed")
-    error_counter = Counter(
-        f"{r.error_code} - {r.error_message}"
-        for r in records
-        if r.error_code is not None and r.error_code not in ZENTRUNK_SUCCESS_CODES
+    successful = sum(
+        1 for r in records if r.hangup_cause in ZENTRUNK_SUCCESS_CAUSES
     )
-    carrier_counter = Counter(r.carrier for r in records)
-    region_counter = Counter(r.region for r in records)
-    country_counter = Counter(r.country for r in records)
-    trunk_counter = Counter(r.trunk_name for r in records)
+    # Error distribution by hangup_cause
+    error_counter = Counter(
+        r.hangup_cause
+        for r in records
+        if r.hangup_cause not in ZENTRUNK_SUCCESS_CAUSES
+    )
+    carrier_counter = Counter(r.carrier_id for r in records if r.carrier_id)
+    country_counter = Counter(r.to_iso for r in records if r.to_iso)
+    initiator_counter = Counter(
+        r.hangup_initiator for r in records
+        if r.hangup_cause not in ZENTRUNK_SUCCESS_CAUSES
+    )
+    transport_counter = Counter(
+        r.transport_protocol for r in records if r.transport_protocol
+    )
 
+    # Aggregate by date (keyed by initiation_time)
     date_stats: dict[str, dict] = {}
     for r in records:
         date = r.initiation_time[:10]
         if date not in date_stats:
             date_stats[date] = {"total": 0, "success": 0}
         date_stats[date]["total"] += 1
-        if r.status == "completed":
+        if r.hangup_cause in ZENTRUNK_SUCCESS_CAUSES:
             date_stats[date]["success"] += 1
 
     failed_samples = [
         {
             "call_uuid": r.call_uuid,
-            "trunk_name": r.trunk_name,
-            "error_code": r.error_code,
-            "error_message": r.error_message,
-            "sip_response_code": r.sip_response_code,
-            "carrier": r.carrier,
-            "region": r.region,
-            "country": r.country,
-            "source_ip": r.source_ip,
+            "hangup_cause": r.hangup_cause,
+            "hangup_code": r.hangup_code,
+            "hangup_initiator": r.hangup_initiator,
+            "carrier_id": r.carrier_id,
+            "carrier_gateway": r.carrier_gateway,
+            "to_iso": r.to_iso,
+            "transport_protocol": r.transport_protocol,
+            "srtp": r.srtp,
         }
         for r in records
-        if r.status != "completed"
+        if r.hangup_cause not in ZENTRUNK_SUCCESS_CAUSES
     ][:5]
 
     return {
@@ -168,9 +211,9 @@ def _aggregate_zentrunk_logs(records: list[ZentrunkRecord]) -> dict:
         "success_rate": round(successful / total * 100, 2) if total > 0 else 0,
         "top_errors": dict(error_counter.most_common(10)),
         "carrier_distribution": dict(carrier_counter.most_common(10)),
-        "region_distribution": dict(region_counter.most_common(10)),
         "country_distribution": dict(country_counter.most_common(10)),
-        "trunk_distribution": dict(trunk_counter.most_common(10)),
+        "initiator_distribution": dict(initiator_counter.most_common(5)),
+        "transport_distribution": dict(transport_counter.most_common(5)),
         "daily_stats": {
             date: round(s["success"] / s["total"] * 100, 2) if s["total"] > 0 else 0
             for date, s in sorted(date_stats.items())
@@ -179,12 +222,15 @@ def _aggregate_zentrunk_logs(records: list[ZentrunkRecord]) -> dict:
     }
 
 
+# ===================================================================
+# Health score / trend helpers
+# ===================================================================
+
 def _compute_extras(aggregated: dict) -> tuple:
     """Compute health score/grade and trend from aggregated data."""
     daily_stats = aggregated["daily_stats"]
     daily_rates = list(daily_stats.values())
 
-    # Daily error rates = 100 - success_rate for each day
     daily_error_rates = [100.0 - r for r in daily_rates]
 
     unique_error_count = len(aggregated["top_errors"])
@@ -196,6 +242,10 @@ def _compute_extras(aggregated: dict) -> tuple:
 
     return health_score, health_grade, trend_info
 
+
+# ===================================================================
+# Mock result builder
+# ===================================================================
 
 def _build_mock_result(aggregated: dict) -> AnalysisResult:
     """Generate a mock analysis result without calling OpenAI."""
@@ -260,6 +310,10 @@ def _build_mock_result(aggregated: dict) -> AnalysisResult:
     )
 
 
+# ===================================================================
+# AI prompt
+# ===================================================================
+
 SYSTEM_PROMPT = """You are a Plivo telecom log analyst. Analyze the aggregated log data and produce a JSON response with the following structure:
 
 {
@@ -287,6 +341,10 @@ Focus on:
 
 Return ONLY valid JSON, no markdown fences or extra text."""
 
+
+# ===================================================================
+# Main entry point
+# ===================================================================
 
 async def analyze_logs(
     records: list[CDRRecord] | list[MDRRecord] | list[ZentrunkRecord], log_type: str

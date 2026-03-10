@@ -4,7 +4,26 @@ export interface TriggerAnalysisRequest {
   from_date: string;
   to_date: string;
   log_type: "voice" | "sms" | "zentrunk";
+  // Common filters
   country?: string;
+  direction?: string;
+  carrier?: string;
+  failed_only?: boolean;
+  // SMS-specific
+  message_state?: string;
+  message_type?: string;
+  number_type?: string;
+  dlr_error?: string;
+  // Voice-specific
+  call_state?: string;
+  hangup_source?: string;
+  tollfree?: string;
+  zero_duration?: boolean;
+  high_pdd?: boolean;
+  // Zentrunk-specific
+  hangup_initiator?: string;
+  transport_protocol?: string;
+  srtp?: boolean;
 }
 
 export interface TriggerAnalysisResponse {

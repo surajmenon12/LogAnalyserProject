@@ -13,34 +13,60 @@ interface LogTableProps {
 
 const PAGE_SIZE = 20;
 
+// Map log type to the carrier field name in the data
+function getCarrierField(logType: string): string {
+  return logType === "zentrunk" ? "carrier_id" : "carrier_name";
+}
+
+// Map log type to the country field name
+function getCountryField(logType: string): string {
+  return logType === "zentrunk" ? "to_iso" : "country_iso";
+}
+
+// Map log type to the status/cause filter field
+function getStatusField(logType: string): string {
+  if (logType === "voice") return "hangup_cause";
+  if (logType === "zentrunk") return "hangup_cause";
+  return "message_state";
+}
+
+// Map log type to the timestamp field
+function getTimeField(logType: string): string {
+  if (logType === "voice") return "start_time";
+  if (logType === "zentrunk") return "initiation_time";
+  return "message_time";
+}
+
 export default function LogTable({ logs, logType, drilldownFilter, onClearDrilldown }: LogTableProps) {
   const [search, setSearch] = useState("");
-  const [carrier, setCarrier] = useState("");
-  const [region, setRegion] = useState("");
-  const [extraFilter, setExtraFilter] = useState("");
+  const [carrierFilter, setCarrierFilter] = useState("");
+  const [countryFilter, setCountryFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(0);
 
-  const extraFilterField = logType === "voice" ? "hangup_cause" : logType === "zentrunk" ? "status" : "status";
-  const extraFilterField2 = logType === "sms" ? "error_code" : logType === "zentrunk" ? "error_code" : null;
+  const carrierField = getCarrierField(logType);
+  const countryField = getCountryField(logType);
+  const statusField = getStatusField(logType);
+  const timeField = getTimeField(logType);
 
   // Get unique values for filter dropdowns
   const uniqueValues = useMemo(() => {
     const carriers = new Set<string>();
-    const regions = new Set<string>();
-    const extras = new Set<string>();
+    const countries = new Set<string>();
+    const statuses = new Set<string>();
     for (const log of logs) {
-      if (log.carrier) carriers.add(String(log.carrier));
-      if (log.region) regions.add(String(log.region));
-      if (log[extraFilterField]) extras.add(String(log[extraFilterField]));
+      if (log[carrierField]) carriers.add(String(log[carrierField]));
+      if (log[countryField]) countries.add(String(log[countryField]));
+      if (log[statusField]) statuses.add(String(log[statusField]));
     }
     return {
       carriers: Array.from(carriers).sort(),
-      regions: Array.from(regions).sort(),
-      extras: Array.from(extras).sort(),
+      countries: Array.from(countries).sort(),
+      statuses: Array.from(statuses).sort(),
     };
-  }, [logs, extraFilterField]);
+  }, [logs, carrierField, countryField, statusField]);
 
   // Filter & search
   const filtered = useMemo(() => {
@@ -50,23 +76,27 @@ export default function LogTable({ logs, logType, drilldownFilter, onClearDrilld
     if (drilldownFilter) {
       if (drilldownFilter.type === "error") {
         result = result.filter((log) => {
-          const errorStr = logType === "voice"
-            ? `${log.hangup_cause_code} - ${log.hangup_cause}`
-            : `${log.error_code} - ${log.error_message}`;
+          let errorStr: string;
+          if (logType === "voice") {
+            errorStr = `${log.plivo_hangup_cause_code} - ${log.plivo_hangup_cause_name}`;
+          } else if (logType === "zentrunk") {
+            errorStr = String(log.hangup_cause || "");
+          } else {
+            errorStr = `${log.dlr_error} - ${log.message_state}`;
+          }
           return errorStr === drilldownFilter.value;
         });
       } else if (drilldownFilter.type === "date") {
         result = result.filter((log) => {
-          const dateField = logType === "voice" || logType === "zentrunk" ? "initiation_time" : "sent_time";
-          const logDate = String(log[dateField] || "").slice(0, 10);
+          const logDate = String(log[timeField] || "").slice(0, 10);
           return logDate === drilldownFilter.value;
         });
       }
     }
 
-    if (carrier) result = result.filter((log) => String(log.carrier) === carrier);
-    if (region) result = result.filter((log) => String(log.region) === region);
-    if (extraFilter) result = result.filter((log) => String(log[extraFilterField]) === extraFilter);
+    if (carrierFilter) result = result.filter((log) => String(log[carrierField]) === carrierFilter);
+    if (countryFilter) result = result.filter((log) => String(log[countryField]) === countryFilter);
+    if (statusFilter) result = result.filter((log) => String(log[statusField]) === statusFilter);
 
     if (search) {
       const q = search.toLowerCase();
@@ -76,7 +106,7 @@ export default function LogTable({ logs, logType, drilldownFilter, onClearDrilld
     }
 
     return result;
-  }, [logs, search, carrier, region, extraFilter, drilldownFilter, logType, extraFilterField]);
+  }, [logs, search, carrierFilter, countryFilter, statusFilter, drilldownFilter, logType, carrierField, countryField, statusField, timeField]);
 
   // Sort
   const sorted = useMemo(() => {
@@ -106,6 +136,8 @@ export default function LogTable({ logs, logType, drilldownFilter, onClearDrilld
   const filename = `${logType}_logs_${new Date().toISOString().slice(0, 10)}`;
 
   const selectClasses = "rounded-[var(--radius-md)] border border-card-border bg-input-bg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all";
+
+  const statusLabel = logType === "voice" || logType === "zentrunk" ? "Hangup Causes" : "Message States";
 
   return (
     <div className="card p-6 space-y-4 overflow-hidden min-w-0">
@@ -169,17 +201,17 @@ export default function LogTable({ logs, logType, drilldownFilter, onClearDrilld
           placeholder="Search all fields..."
           className={`flex-1 min-w-[200px] ${selectClasses}`}
         />
-        <select value={carrier} onChange={(e) => { setCarrier(e.target.value); setPage(0); }} className={selectClasses}>
+        <select value={carrierFilter} onChange={(e) => { setCarrierFilter(e.target.value); setPage(0); }} className={selectClasses}>
           <option value="">All Carriers</option>
           {uniqueValues.carriers.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select value={region} onChange={(e) => { setRegion(e.target.value); setPage(0); }} className={selectClasses}>
-          <option value="">All Regions</option>
-          {uniqueValues.regions.map((r) => <option key={r} value={r}>{r}</option>)}
+        <select value={countryFilter} onChange={(e) => { setCountryFilter(e.target.value); setPage(0); }} className={selectClasses}>
+          <option value="">All Countries</option>
+          {uniqueValues.countries.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select value={extraFilter} onChange={(e) => { setExtraFilter(e.target.value); setPage(0); }} className={selectClasses}>
-          <option value="">All {extraFilterField === "hangup_cause" ? "Hangup Causes" : logType === "zentrunk" ? "Statuses" : "Statuses"}</option>
-          {uniqueValues.extras.map((e) => <option key={e} value={e}>{e}</option>)}
+        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }} className={selectClasses}>
+          <option value="">All {statusLabel}</option>
+          {uniqueValues.statuses.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
 

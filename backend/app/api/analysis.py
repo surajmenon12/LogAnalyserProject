@@ -11,13 +11,25 @@ router = APIRouter()
 async def trigger_analysis(
     request: TriggerAnalysisRequest, background_tasks: BackgroundTasks
 ):
+    # Collect all optional filters into a dict for the workflow
+    filters = {}
+    for field in (
+        "country", "direction", "carrier", "failed_only",
+        "message_state", "message_type", "number_type", "dlr_error",
+        "call_state", "hangup_source", "tollfree", "zero_duration", "high_pdd",
+        "hangup_initiator", "transport_protocol", "srtp",
+    ):
+        val = getattr(request, field, None)
+        if val is not None and val != "" and val is not False:
+            filters[field] = val
+
     state = create_workflow(
         auth_id=request.auth_id,
         email=request.email,
         from_date=request.from_date,
         to_date=request.to_date,
         log_type=request.log_type,
-        country=request.country,
+        filters=filters if filters else None,
     )
     background_tasks.add_task(run_workflow, state.analysis_id)
 

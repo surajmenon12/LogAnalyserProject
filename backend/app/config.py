@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ZENDESK_API_TOKEN: str = ""
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     LOG_LEVEL: str = "INFO"
+    MOCK_REDSHIFT: bool = False
 
     # Redshift (READ-ONLY)
     REDSHIFT_HOST: str = ""
