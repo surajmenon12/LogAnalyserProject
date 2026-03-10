@@ -17,6 +17,7 @@ async def trigger_analysis(
         from_date=request.from_date,
         to_date=request.to_date,
         log_type=request.log_type,
+        country=request.country,
     )
     background_tasks.add_task(run_workflow, state.analysis_id)
 

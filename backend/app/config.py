@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     LOG_LEVEL: str = "INFO"
 
+    # Redshift (READ-ONLY)
+    REDSHIFT_HOST: str = ""
+    REDSHIFT_PORT: int = 5439
+    REDSHIFT_DATABASE: str = ""
+    REDSHIFT_USER: str = ""
+    REDSHIFT_PASSWORD: str = ""
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

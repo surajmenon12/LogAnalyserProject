@@ -22,8 +22,8 @@ export default function LogTable({ logs, logType, drilldownFilter, onClearDrilld
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(0);
 
-  const extraFilterField = logType === "voice" ? "hangup_cause" : "status";
-  const extraFilterField2 = logType === "sms" ? "error_code" : null;
+  const extraFilterField = logType === "voice" ? "hangup_cause" : logType === "zentrunk" ? "status" : "status";
+  const extraFilterField2 = logType === "sms" ? "error_code" : logType === "zentrunk" ? "error_code" : null;
 
   // Get unique values for filter dropdowns
   const uniqueValues = useMemo(() => {
@@ -57,7 +57,7 @@ export default function LogTable({ logs, logType, drilldownFilter, onClearDrilld
         });
       } else if (drilldownFilter.type === "date") {
         result = result.filter((log) => {
-          const dateField = logType === "voice" ? "initiation_time" : "sent_time";
+          const dateField = logType === "voice" || logType === "zentrunk" ? "initiation_time" : "sent_time";
           const logDate = String(log[dateField] || "").slice(0, 10);
           return logDate === drilldownFilter.value;
         });
@@ -178,7 +178,7 @@ export default function LogTable({ logs, logType, drilldownFilter, onClearDrilld
           {uniqueValues.regions.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
         <select value={extraFilter} onChange={(e) => { setExtraFilter(e.target.value); setPage(0); }} className={selectClasses}>
-          <option value="">All {extraFilterField === "hangup_cause" ? "Hangup Causes" : "Statuses"}</option>
+          <option value="">All {extraFilterField === "hangup_cause" ? "Hangup Causes" : logType === "zentrunk" ? "Statuses" : "Statuses"}</option>
           {uniqueValues.extras.map((e) => <option key={e} value={e}>{e}</option>)}
         </select>
       </div>

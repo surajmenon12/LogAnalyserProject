@@ -13,7 +13,13 @@ export default function AnalysisForm({ onSubmit, submitting }: AnalysisFormProps
   const [email, setEmail] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [logType, setLogType] = useState<"voice" | "sms">("voice");
+  const [logType, setLogType] = useState<"voice" | "sms" | "zentrunk">("voice");
+  const [country, setCountry] = useState("");
+
+  const countries = [
+    "US", "UK", "India", "Germany", "France", "Canada", "Australia",
+    "Japan", "Brazil", "Singapore", "Mexico", "Italy", "Spain", "Netherlands", "Sweden",
+  ];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +29,7 @@ export default function AnalysisForm({ onSubmit, submitting }: AnalysisFormProps
       from_date: fromDate,
       to_date: toDate,
       log_type: logType,
+      ...(country ? { country } : {}),
     });
   };
 
@@ -107,7 +114,7 @@ export default function AnalysisForm({ onSubmit, submitting }: AnalysisFormProps
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">Log Type</label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <button
               type="button"
               onClick={() => setLogType("voice")}
@@ -151,7 +158,47 @@ export default function AnalysisForm({ onSubmit, submitting }: AnalysisFormProps
                 <p className="text-[11px] text-text-muted">MDR Logs</p>
               </div>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setLogType("zentrunk")}
+              className={`flex items-center gap-3 p-3.5 rounded-[var(--radius-md)] border-2 transition-all text-left ${
+                logType === "zentrunk"
+                  ? "border-primary bg-primary-light"
+                  : "border-card-border bg-input-bg hover:border-gray-300"
+              }`}
+            >
+              <div className={`w-9 h-9 rounded-[var(--radius-sm)] flex items-center justify-center ${
+                logType === "zentrunk" ? "bg-primary/15 text-primary" : "bg-muted-bg text-text-muted"
+              }`}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                  <line x1="4" y1="22" x2="4" y2="15" />
+                </svg>
+              </div>
+              <div>
+                <p className={`text-sm font-medium ${logType === "zentrunk" ? "text-foreground" : "text-text-secondary"}`}>Zentrunk</p>
+                <p className="text-[11px] text-text-muted">SIP Trunk Logs</p>
+              </div>
+            </button>
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="country" className="block text-sm font-medium text-foreground mb-1.5">
+            Country <span className="text-text-muted font-normal">(optional)</span>
+          </label>
+          <select
+            id="country"
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            className={inputClasses}
+          >
+            <option value="">All Countries</option>
+            {countries.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
         </div>
       </div>
 

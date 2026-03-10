@@ -8,11 +8,12 @@ from typing import Dict, List, Union
 import openai
 
 from app.config import settings
-from app.core.constants import HANGUP_CAUSES, SMS_ERROR_CODES, SUCCESS_HANGUP_CODES, SMS_SUCCESS_CODES
+from app.core.constants import HANGUP_CAUSES, SMS_ERROR_CODES, SUCCESS_HANGUP_CODES, SMS_SUCCESS_CODES, ZENTRUNK_ERROR_CODES, ZENTRUNK_SUCCESS_CODES
 from app.core.exceptions import AIAnalysisError
 from app.models.analysis import AnalysisIssue, AnalysisResult, ChartData, TrendInfo
 from app.models.cdr import CDRRecord
 from app.models.mdr import MDRRecord
+from app.models.zentrunk import ZentrunkRecord
 from app.services.health_score import compute_health_score
 from app.services.trend_detection import detect_trend
 
@@ -121,6 +122,63 @@ def _aggregate_mdr_logs(records: list[MDRRecord]) -> dict:
     }
 
 
+def _aggregate_zentrunk_logs(records: list[ZentrunkRecord]) -> dict:
+    total = len(records)
+    successful = sum(1 for r in records if r.status == "completed")
+    error_counter = Counter(
+        f"{r.error_code} - {r.error_message}"
+        for r in records
+        if r.error_code is not None and r.error_code not in ZENTRUNK_SUCCESS_CODES
+    )
+    carrier_counter = Counter(r.carrier for r in records)
+    region_counter = Counter(r.region for r in records)
+    country_counter = Counter(r.country for r in records)
+    trunk_counter = Counter(r.trunk_name for r in records)
+
+    date_stats: dict[str, dict] = {}
+    for r in records:
+        date = r.initiation_time[:10]
+        if date not in date_stats:
+            date_stats[date] = {"total": 0, "success": 0}
+        date_stats[date]["total"] += 1
+        if r.status == "completed":
+            date_stats[date]["success"] += 1
+
+    failed_samples = [
+        {
+            "call_uuid": r.call_uuid,
+            "trunk_name": r.trunk_name,
+            "error_code": r.error_code,
+            "error_message": r.error_message,
+            "sip_response_code": r.sip_response_code,
+            "carrier": r.carrier,
+            "region": r.region,
+            "country": r.country,
+            "source_ip": r.source_ip,
+        }
+        for r in records
+        if r.status != "completed"
+    ][:5]
+
+    return {
+        "log_type": "zentrunk",
+        "total_records": total,
+        "successful": successful,
+        "failed": total - successful,
+        "success_rate": round(successful / total * 100, 2) if total > 0 else 0,
+        "top_errors": dict(error_counter.most_common(10)),
+        "carrier_distribution": dict(carrier_counter.most_common(10)),
+        "region_distribution": dict(region_counter.most_common(10)),
+        "country_distribution": dict(country_counter.most_common(10)),
+        "trunk_distribution": dict(trunk_counter.most_common(10)),
+        "daily_stats": {
+            date: round(s["success"] / s["total"] * 100, 2) if s["total"] > 0 else 0
+            for date, s in sorted(date_stats.items())
+        },
+        "failed_samples": failed_samples,
+    }
+
+
 def _compute_extras(aggregated: dict) -> tuple:
     """Compute health score/grade and trend from aggregated data."""
     daily_stats = aggregated["daily_stats"]
@@ -153,7 +211,7 @@ def _build_mock_result(aggregated: dict) -> AnalysisResult:
                 severity=severity,
                 description=f"Error '{error}' occurred {count} times across the analyzed period.",
                 affected_records=count,
-                recommendation=f"Investigate {'carrier routing' if log_type == 'voice' else 'message delivery'} for this error pattern. Check if specific carriers or regions are disproportionately affected.",
+                recommendation=f"Investigate {'carrier routing' if log_type == 'voice' else 'trunk configuration' if log_type == 'zentrunk' else 'message delivery'} for this error pattern. Check if specific carriers or regions are disproportionately affected.",
             )
         )
 
@@ -231,10 +289,12 @@ Return ONLY valid JSON, no markdown fences or extra text."""
 
 
 async def analyze_logs(
-    records: list[CDRRecord] | list[MDRRecord], log_type: str
+    records: list[CDRRecord] | list[MDRRecord] | list[ZentrunkRecord], log_type: str
 ) -> AnalysisResult:
     if log_type == "voice":
         aggregated = _aggregate_cdr_logs(records)  # type: ignore[arg-type]
+    elif log_type == "zentrunk":
+        aggregated = _aggregate_zentrunk_logs(records)  # type: ignore[arg-type]
     else:
         aggregated = _aggregate_mdr_logs(records)  # type: ignore[arg-type]
 

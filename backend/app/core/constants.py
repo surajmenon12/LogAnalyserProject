@@ -97,6 +97,61 @@ REGIONS = [
     "Australia",
 ]
 
+# Zentrunk (SIP Trunking) Error Codes
+ZENTRUNK_ERROR_CODES: dict[int, str] = {
+    0: "Call Completed",
+    600: "Trunk Registration Failed",
+    601: "Trunk Authentication Error",
+    602: "Invalid Trunk Configuration",
+    603: "Trunk Capacity Exceeded",
+    604: "Codec Mismatch",
+    605: "IP Not Whitelisted",
+    606: "Media Timeout",
+    607: "RTP Stream Error",
+    608: "Trunk Failover Triggered",
+    609: "QoS Threshold Exceeded",
+    610: "TLS Handshake Failed",
+    611: "SRTP Negotiation Error",
+    612: "DNS Resolution Failed",
+    613: "SIP Timeout",
+    614: "Trunk Suspended",
+}
+
+ZENTRUNK_SUCCESS_CODES = {0}
+
+# Trunk names
+TRUNK_NAMES = [
+    "primary-us-east",
+    "primary-us-west",
+    "primary-eu",
+    "backup-us",
+    "backup-eu",
+    "apac-primary",
+    "india-primary",
+    "uk-primary",
+    "canada-primary",
+    "latam-primary",
+]
+
+# Countries
+COUNTRIES = [
+    "US",
+    "UK",
+    "India",
+    "Germany",
+    "France",
+    "Canada",
+    "Australia",
+    "Japan",
+    "Brazil",
+    "Singapore",
+    "Mexico",
+    "Italy",
+    "Spain",
+    "Netherlands",
+    "Sweden",
+]
+
 # SIP response codes relevant to voice calls
 SIP_RESPONSE_CODES: dict[int, str] = {
     200: "OK",

@@ -8,7 +8,7 @@ from typing import Dict, List, Optional
 
 from app.models.analysis import AnalysisResult
 from app.services.openai_analyzer import analyze_logs
-from app.services.mock_redshift import generate_cdr_records, generate_mdr_records
+from app.services.mock_redshift import generate_cdr_records, generate_mdr_records, generate_zentrunk_records
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +22,14 @@ class WorkflowStatus(str, Enum):
 
 
 class WorkflowState:
-    def __init__(self, auth_id: Optional[str], email: Optional[str], from_date: str, to_date: str, log_type: str):
+    def __init__(self, auth_id: Optional[str], email: Optional[str], from_date: str, to_date: str, log_type: str, country: Optional[str] = None):
         self.analysis_id: str = str(uuid.uuid4())
         self.auth_id = auth_id or ""
         self.email = email or ""
         self.from_date = from_date
         self.to_date = to_date
         self.log_type = log_type
+        self.country = country
         self.status: WorkflowStatus = WorkflowStatus.QUEUED
         self.progress_pct: int = 0
         self.message: str = "Analysis queued"
@@ -41,9 +42,9 @@ _workflows: Dict[str, WorkflowState] = {}
 
 
 def create_workflow(
-    auth_id: Optional[str], email: Optional[str], from_date: str, to_date: str, log_type: str
+    auth_id: Optional[str], email: Optional[str], from_date: str, to_date: str, log_type: str, country: Optional[str] = None
 ) -> WorkflowState:
-    state = WorkflowState(auth_id, email, from_date, to_date, log_type)
+    state = WorkflowState(auth_id, email, from_date, to_date, log_type, country)
     _workflows[state.analysis_id] = state
     return state
 
@@ -69,6 +70,9 @@ async def run_workflow(analysis_id: str) -> None:
         identifier = state.auth_id or state.email
         if state.log_type == "voice":
             records = generate_cdr_records(identifier, state.from_date, state.to_date)
+            raw_logs = [r.model_dump() for r in records]
+        elif state.log_type == "zentrunk":
+            records = generate_zentrunk_records(identifier, state.from_date, state.to_date, state.country)
             raw_logs = [r.model_dump() for r in records]
         else:
             records = generate_mdr_records(identifier, state.from_date, state.to_date)

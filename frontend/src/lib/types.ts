@@ -3,7 +3,8 @@ export interface TriggerAnalysisRequest {
   email?: string;
   from_date: string;
   to_date: string;
-  log_type: "voice" | "sms";
+  log_type: "voice" | "sms" | "zentrunk";
+  country?: string;
 }
 
 export interface TriggerAnalysisResponse {

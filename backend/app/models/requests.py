@@ -8,7 +8,8 @@ class TriggerAnalysisRequest(BaseModel):
     email: Optional[str] = Field(None, description="Customer email address")
     from_date: str = Field(..., description="Start date (YYYY-MM-DD)")
     to_date: str = Field(..., description="End date (YYYY-MM-DD)")
-    log_type: str = Field(..., pattern="^(voice|sms)$", description="Log type: voice or sms")
+    log_type: str = Field(..., pattern="^(voice|sms|zentrunk)$", description="Log type: voice, sms, or zentrunk")
+    country: Optional[str] = Field(None, description="Country filter (e.g. US, UK, India)")
 
     @validator("email", always=True)
     def at_least_one_identifier(cls, email, values):  # noqa: N805
