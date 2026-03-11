@@ -7,6 +7,8 @@ which are then mapped to Pydantic models.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import psycopg2
@@ -69,9 +71,21 @@ def execute_query(sql: str) -> List[Dict[str, Any]]:
 # High-level fetch helpers
 # -------------------------------------------------------------------
 
-def _str_or_none(val: Any) -> Optional[str]:
-    """Convert a value to str if truthy, else None."""
-    return str(val) if val else None
+def _normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert Redshift-native types to JSON/Pydantic-friendly values.
+
+    - datetime  → ISO 8601 string
+    - Decimal   → int or float
+    """
+    out: Dict[str, Any] = {}
+    for key, val in row.items():
+        if isinstance(val, datetime):
+            out[key] = val.isoformat()
+        elif isinstance(val, Decimal):
+            out[key] = int(val) if val == int(val) else float(val)
+        else:
+            out[key] = val
+    return out
 
 
 def fetch_cdr_records(
@@ -96,7 +110,7 @@ def fetch_cdr_records(
         high_pdd_only=filters.get("high_pdd", False),
     )
     rows = execute_query(sql)
-    return [CDRRecord(**row) for row in rows]
+    return [CDRRecord(**_normalize_row(row)) for row in rows]
 
 
 def fetch_mdr_records(
@@ -118,9 +132,10 @@ def fetch_mdr_records(
         number_type=filters.get("number_type"),
         dlr_error=filters.get("dlr_error"),
         failed_only=filters.get("failed_only", False),
+        with_enriched=False,
     )
     rows = execute_query(sql)
-    return [MDRRecord(**row) for row in rows]
+    return [MDRRecord(**_normalize_row(row)) for row in rows]
 
 
 def fetch_zentrunk_records(
@@ -152,4 +167,4 @@ def fetch_zentrunk_records(
         failed_only=filters.get("failed_only", False),
     )
     rows = execute_query(sql)
-    return [ZentrunkRecord(**row) for row in rows]
+    return [ZentrunkRecord(**_normalize_row(row)) for row in rows]

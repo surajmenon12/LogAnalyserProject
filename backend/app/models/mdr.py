@@ -12,14 +12,14 @@ class MDRRecord(BaseModel):
     from_number: str
     to_number: str
     message_direction: str          # inbound / outbound
-    message_state: str              # delivered / undelivered / sent / failed
-    message_type: str               # sms / mms
-    dlr_error: str                  # "000" = success, "801", "300", etc.
-    carrier_name: str               # clx, mitto-standard, sap-33433, etc.
+    message_state: Optional[str] = None   # delivered / undelivered / sent / failed
+    message_type: Optional[str] = None    # sms / mms
+    dlr_error: Optional[str] = None       # "000" = success, "801", "300", etc.
+    carrier_name: Optional[str] = None    # clx, mitto-standard, sap-33433, etc.
     carrier_id: Optional[str] = None
-    country_iso: str                # US, AU, IR, JP, etc.
+    country_iso: Optional[str] = None   # US, AU, IR, JP, etc.
     to_iso: Optional[str] = None
-    units: int                      # SMS segment count
+    units: Optional[int] = 1            # SMS segment count
     message_time: str               # timestamp
     number_type: Optional[str] = None  # local, mobile, shortcode, tollfree
 

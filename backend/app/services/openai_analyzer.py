@@ -37,13 +37,16 @@ def _aggregate_cdr_logs(records: list[CDRRecord]) -> dict:
     error_counter = Counter(
         f"{r.plivo_hangup_cause_code} - {r.plivo_hangup_cause_name}"
         for r in records
-        if r.plivo_hangup_cause_code not in SUCCESS_HANGUP_CODES
+        if r.plivo_hangup_cause_code is not None
+        and r.plivo_hangup_cause_code not in SUCCESS_HANGUP_CODES
     )
-    carrier_counter = Counter(r.carrier_name for r in records)
-    country_counter = Counter(r.country_iso for r in records)
+    carrier_counter = Counter(r.carrier_name for r in records if r.carrier_name)
+    country_counter = Counter(r.country_iso for r in records if r.country_iso)
     hangup_source_counter = Counter(
         r.plivo_hangup_source for r in records
-        if r.plivo_hangup_cause_code not in SUCCESS_HANGUP_CODES
+        if r.plivo_hangup_source
+        and r.plivo_hangup_cause_code is not None
+        and r.plivo_hangup_cause_code not in SUCCESS_HANGUP_CODES
     )
 
     # Aggregate by date for success rate over time (keyed by start_time)
@@ -102,10 +105,10 @@ def _aggregate_mdr_logs(records: list[MDRRecord]) -> dict:
     error_counter = Counter(
         f"{r.dlr_error} - {r.message_state}"
         for r in records
-        if r.dlr_error not in DLR_SUCCESS_CODES
+        if r.dlr_error and r.dlr_error not in DLR_SUCCESS_CODES
     )
-    carrier_counter = Counter(r.carrier_name for r in records)
-    country_counter = Counter(r.country_iso for r in records)
+    carrier_counter = Counter(r.carrier_name for r in records if r.carrier_name)
+    country_counter = Counter(r.country_iso for r in records if r.country_iso)
     number_type_counter = Counter(
         r.number_type for r in records if r.number_type
     )
@@ -159,19 +162,20 @@ def _aggregate_mdr_logs(records: list[MDRRecord]) -> dict:
 def _aggregate_zentrunk_logs(records: list[ZentrunkRecord]) -> dict:
     total = len(records)
     successful = sum(
-        1 for r in records if r.hangup_cause in ZENTRUNK_SUCCESS_CAUSES
+        1 for r in records if r.hangup_cause and r.hangup_cause in ZENTRUNK_SUCCESS_CAUSES
     )
     # Error distribution by hangup_cause
     error_counter = Counter(
         r.hangup_cause
         for r in records
-        if r.hangup_cause not in ZENTRUNK_SUCCESS_CAUSES
+        if r.hangup_cause and r.hangup_cause not in ZENTRUNK_SUCCESS_CAUSES
     )
     carrier_counter = Counter(r.carrier_id for r in records if r.carrier_id)
     country_counter = Counter(r.to_iso for r in records if r.to_iso)
     initiator_counter = Counter(
         r.hangup_initiator for r in records
-        if r.hangup_cause not in ZENTRUNK_SUCCESS_CAUSES
+        if r.hangup_initiator
+        and r.hangup_cause and r.hangup_cause not in ZENTRUNK_SUCCESS_CAUSES
     )
     transport_counter = Counter(
         r.transport_protocol for r in records if r.transport_protocol
@@ -184,7 +188,7 @@ def _aggregate_zentrunk_logs(records: list[ZentrunkRecord]) -> dict:
         if date not in date_stats:
             date_stats[date] = {"total": 0, "success": 0}
         date_stats[date]["total"] += 1
-        if r.hangup_cause in ZENTRUNK_SUCCESS_CAUSES:
+        if r.hangup_cause and r.hangup_cause in ZENTRUNK_SUCCESS_CAUSES:
             date_stats[date]["success"] += 1
 
     failed_samples = [
@@ -200,7 +204,7 @@ def _aggregate_zentrunk_logs(records: list[ZentrunkRecord]) -> dict:
             "srtp": r.srtp,
         }
         for r in records
-        if r.hangup_cause not in ZENTRUNK_SUCCESS_CAUSES
+        if r.hangup_cause and r.hangup_cause not in ZENTRUNK_SUCCESS_CAUSES
     ][:5]
 
     return {

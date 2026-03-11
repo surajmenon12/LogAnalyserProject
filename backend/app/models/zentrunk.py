@@ -15,9 +15,9 @@ class ZentrunkRecord(BaseModel):
     from_number: str                         # SIP username or phone number
     to_number: str
     call_direction: str                      # inbound / outbound
-    hangup_cause: str                        # normal_clearing, originator_cancel, etc.
+    hangup_cause: Optional[str] = None        # normal_clearing, originator_cancel, etc.
     hangup_code: Optional[int] = None        # SIP/Q.850 cause code
-    hangup_initiator: str                    # customer, carrier, callee
+    hangup_initiator: Optional[str] = None   # customer, carrier, callee
     carrier_id: Optional[str] = None
     carrier_gateway: Optional[str] = None    # sip:+18593618614@4.55.40.227
     from_iso: Optional[str] = None
@@ -25,8 +25,8 @@ class ZentrunkRecord(BaseModel):
     initiation_time: str                     # timestamp
     answer_time: Optional[str] = None        # '1970-01-01' = unanswered
     end_time: str                            # timestamp
-    duration: int                            # seconds, 0 = failed/unanswered
-    bill_duration: int                       # seconds
+    duration: Optional[int] = 0              # seconds, 0 = failed/unanswered
+    bill_duration: Optional[int] = 0         # seconds
     transport_protocol: Optional[str] = None  # udp, tcp, tls
     srtp: Optional[bool] = None               # media encryption
     src_codec: Optional[str] = None           # PCMU,telephone-event/8000,CN

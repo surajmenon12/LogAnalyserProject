@@ -141,53 +141,55 @@ def build_mdr_query(
       10. + LEFT JOIN fact_mdr_enriched for enr_error_code, dst_number_type
     """
     # --- SELECT columns ------------------------------------------------
-    cols = [f"raw.{c}" for c in MDR_COLUMNS]
+    cols = [f"m.{c}" for c in MDR_COLUMNS]
     if with_enriched:
         cols.extend(MDR_ENRICHED_COLUMNS)
     select_clause = ",\n       ".join(cols)
 
     # --- FROM / JOIN ---------------------------------------------------
-    from_clause = "base.mdr_raw_airflow raw"
+    from_clause = "base.mdr_raw_airflow m"
     if with_enriched:
         from_clause += (
             "\n  LEFT JOIN base.fact_mdr_enriched enr"
-            "\n    ON raw.message_uuid = enr.message_uuid"
+            "\n    ON m.message_uuid = enr.message_uuid"
         )
 
     # --- WHERE ---------------------------------------------------------
     conditions: list[str] = []
 
-    # Identifier (account_id takes precedence over username)
-    if account_id:
-        conditions.append(f"raw.account_id = '{account_id}'")
+    # Identifier — search both account_id and username with OR
+    if account_id and username:
+        conditions.append(f"(m.account_id = '{account_id}' OR m.username = '{username}')")
+    elif account_id:
+        conditions.append(f"(m.account_id = '{account_id}' OR m.username = '{account_id}')")
     elif username:
-        conditions.append(f"raw.username = '{username}'")
+        conditions.append(f"(m.account_id = '{username}' OR m.username = '{username}')")
 
     # Date range (inclusive)
     if from_date:
-        conditions.append(f"raw.message_time >= '{from_date} 00:00:00'")
+        conditions.append(f"m.message_time >= '{from_date} 00:00:00'")
     if to_date:
-        conditions.append(f"raw.message_time <= '{to_date} 23:59:59'")
+        conditions.append(f"m.message_time <= '{to_date} 23:59:59'")
 
     # Optional filters
     if country_iso:
-        conditions.append(f"raw.country_iso = '{country_iso}'")
+        conditions.append(f"m.country_iso = '{country_iso}'")
     if direction:
-        conditions.append(f"raw.message_direction = '{direction}'")
+        conditions.append(f"m.message_direction = '{direction}'")
     if message_type:
-        conditions.append(f"raw.message_type = '{message_type}'")
+        conditions.append(f"m.message_type = '{message_type}'")
     if carrier_name:
-        conditions.append(f"raw.carrier_name = '{carrier_name}'")
+        conditions.append(f"m.carrier_name = '{carrier_name}'")
     if number_type:
-        conditions.append(f"raw.number_type = '{number_type}'")
+        conditions.append(f"m.number_type = '{number_type}'")
     if dlr_error:
-        conditions.append(f"raw.dlr_error = '{dlr_error}'")
+        conditions.append(f"m.dlr_error = '{dlr_error}'")
 
     # Failed-only shortcut
     if failed_only:
-        conditions.append("raw.message_state IN ('undelivered', 'failed')")
+        conditions.append("m.message_state IN ('undelivered', 'failed')")
     elif message_state:
-        conditions.append(f"raw.message_state = '{message_state}'")
+        conditions.append(f"m.message_state = '{message_state}'")
 
     where_clause = "\n   AND ".join(conditions) if conditions else "1=1"
 
@@ -195,7 +197,7 @@ def build_mdr_query(
         f"SELECT {select_clause}\n"
         f"  FROM {from_clause}\n"
         f" WHERE {where_clause}\n"
-        f" ORDER BY raw.message_time DESC\n"
+        f" ORDER BY m.message_time DESC\n"
         f" LIMIT {ROW_LIMIT};"
     )
 
@@ -242,11 +244,13 @@ def build_cdr_query(
     select_clause = ",\n       ".join(CDR_COLUMNS)
     conditions: list[str] = []
 
-    # Identifier
-    if account_id:
-        conditions.append(f"account_id = '{account_id}'")
+    # Identifier — search both account_id and username with OR
+    if account_id and username:
+        conditions.append(f"(account_id = '{account_id}' OR username = '{username}')")
+    elif account_id:
+        conditions.append(f"(account_id = '{account_id}' OR username = '{account_id}')")
     elif username:
-        conditions.append(f"username = '{username}'")
+        conditions.append(f"(account_id = '{username}' OR username = '{username}')")
 
     # Date range
     if from_date:
@@ -339,7 +343,7 @@ def build_zentrunk_query(
     select_clause = ",\n       ".join(ZENTRUNK_COLUMNS)
     conditions: list[str] = []
 
-    # Identifier — only account_id for Zentrunk
+    # Identifier — Zentrunk has no username, but try both account_id fields
     if account_id:
         conditions.append(f"account_id = '{account_id}'")
 
