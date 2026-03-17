@@ -5,7 +5,7 @@ export interface TriggerAnalysisRequest {
   to_date: string;
   log_type: "voice" | "sms" | "zentrunk";
   // Common filters
-  country?: string;
+  country?: string[];
   direction?: string;
   carrier?: string;
   failed_only?: boolean;

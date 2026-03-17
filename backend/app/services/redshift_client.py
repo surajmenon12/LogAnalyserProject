@@ -46,6 +46,55 @@ def get_connection():
     )
 
 
+# -------------------------------------------------------------------
+# Identifier resolution: email / auth_id → (account_id, username)
+# -------------------------------------------------------------------
+
+def resolve_identifier(
+    auth_id: Optional[str] = None,
+    email: Optional[str] = None,
+) -> Dict[str, Optional[str]]:
+    """Resolve an email or auth_id (MAXX…) into the numeric account_id
+    and hex username used by CDR/MDR/Zentrunk tables.
+
+    Returns dict with keys: account_id, username, auth_id.
+    All values are strings (account_id is the numeric id as str).
+    Raises RedshiftError if lookup fails or no match found.
+    """
+    if auth_id and auth_id.startswith("MA"):
+        sql = (
+            "SELECT paa.id AS account_id, au.username, paa.auth_id "
+            "FROM base.plivo_account_account paa "
+            "JOIN base.auth_user au ON au.id = paa.user_id "
+            f"WHERE paa.auth_id = '{auth_id}' "
+            "LIMIT 1;"
+        )
+    elif email:
+        sql = (
+            "SELECT paa.id AS account_id, au.username, paa.auth_id "
+            "FROM base.auth_user au "
+            "JOIN base.plivo_account_account paa ON au.id = paa.user_id "
+            f"WHERE au.email = '{email}' "
+            "LIMIT 1;"
+        )
+    else:
+        # Treat raw identifier as account_id or username directly
+        return {"account_id": auth_id or email, "username": None, "auth_id": None}
+
+    rows = execute_query(sql)
+    if not rows:
+        raise RedshiftError(
+            f"No account found for {'auth_id=' + auth_id if auth_id else 'email=' + (email or '')}"
+        )
+
+    row = rows[0]
+    return {
+        "account_id": str(row["account_id"]),
+        "username": row.get("username"),
+        "auth_id": row.get("auth_id"),
+    }
+
+
 def execute_query(sql: str) -> List[Dict[str, Any]]:
     """Execute a read-only SQL query and return rows as list of dicts."""
     truncated = sql[:200] + "..." if len(sql) > 200 else sql
@@ -93,10 +142,12 @@ def fetch_cdr_records(
     from_date: str,
     to_date: str,
     filters: Dict[str, Any],
+    username: Optional[str] = None,
 ) -> List[CDRRecord]:
     """Fetch CDR records from Redshift and return as Pydantic models."""
     sql = build_cdr_query(
         account_id=identifier,
+        username=username,
         from_date=from_date,
         to_date=to_date,
         country_iso=filters.get("country"),
@@ -118,10 +169,12 @@ def fetch_mdr_records(
     from_date: str,
     to_date: str,
     filters: Dict[str, Any],
+    username: Optional[str] = None,
 ) -> List[MDRRecord]:
     """Fetch MDR records from Redshift and return as Pydantic models."""
     sql = build_mdr_query(
         account_id=identifier,
+        username=username,
         from_date=from_date,
         to_date=to_date,
         country_iso=filters.get("country"),
@@ -143,6 +196,7 @@ def fetch_zentrunk_records(
     from_date: str,
     to_date: str,
     filters: Dict[str, Any],
+    username: Optional[str] = None,
 ) -> List[ZentrunkRecord]:
     """Fetch Zentrunk records from Redshift and return as Pydantic models."""
     srtp_val = filters.get("srtp")

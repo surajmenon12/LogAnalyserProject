@@ -20,7 +20,7 @@ async def trigger_analysis(
         "hangup_initiator", "transport_protocol", "srtp",
     ):
         val = getattr(request, field, None)
-        if val is not None and val != "" and val is not False:
+        if val is not None and val != "" and val is not False and val != []:
             filters[field] = val
 
     state = create_workflow(

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { TriggerAnalysisRequest } from "@/lib/types";
+import { COUNTRIES } from "@/lib/countries";
 
 interface AnalysisFormProps {
   onSubmit: (data: TriggerAnalysisRequest) => void;
@@ -17,7 +18,10 @@ export default function AnalysisForm({ onSubmit, submitting }: AnalysisFormProps
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Common filters
-  const [country, setCountry] = useState("");
+  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+  const [countrySearch, setCountrySearch] = useState("");
+  const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
+  const countryRef = useRef<HTMLDivElement>(null);
   const [direction, setDirection] = useState("");
   const [carrier, setCarrier] = useState("");
   const [failedOnly, setFailedOnly] = useState(false);
@@ -40,10 +44,28 @@ export default function AnalysisForm({ onSubmit, submitting }: AnalysisFormProps
   const [transportProtocol, setTransportProtocol] = useState("");
   const [srtp, setSrtp] = useState("");
 
-  const countries = [
-    "US", "UK", "IN", "DE", "FR", "CA", "AU", "JP", "BR", "SG",
-    "MX", "IT", "ES", "NL", "SE", "IR", "KR", "TH", "PH", "ZA",
-  ];
+  // Close country dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (countryRef.current && !countryRef.current.contains(e.target as Node)) {
+        setCountryDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredCountries = COUNTRIES.filter(
+    (c) =>
+      c.code.toLowerCase().includes(countrySearch.toLowerCase()) ||
+      c.name.toLowerCase().includes(countrySearch.toLowerCase())
+  );
+
+  const toggleCountry = (code: string) => {
+    setSelectedCountries((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +76,7 @@ export default function AnalysisForm({ onSubmit, submitting }: AnalysisFormProps
       to_date: toDate,
       log_type: logType,
       // Common
-      ...(country ? { country } : {}),
+      ...(selectedCountries.length ? { country: selectedCountries } : {}),
       ...(direction ? { direction } : {}),
       ...(carrier ? { carrier } : {}),
       ...(failedOnly ? { failed_only: true } : {}),
@@ -206,12 +228,78 @@ export default function AnalysisForm({ onSubmit, submitting }: AnalysisFormProps
           <div className="space-y-4 p-4 bg-hover-bg rounded-[var(--radius-md)] border border-card-border">
             {/* Common filters */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">Country</label>
-                <select value={country} onChange={(e) => setCountry(e.target.value)} className={selectClasses}>
-                  <option value="">All Countries</option>
-                  {countries.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+              <div ref={countryRef} className="relative">
+                <label className="block text-xs font-medium text-text-secondary mb-1">Countries</label>
+                <button
+                  type="button"
+                  onClick={() => setCountryDropdownOpen(!countryDropdownOpen)}
+                  className={`${selectClasses} text-left flex items-center justify-between`}
+                >
+                  <span className={selectedCountries.length ? "text-foreground" : "text-text-muted"}>
+                    {selectedCountries.length
+                      ? `${selectedCountries.length} selected`
+                      : "All Countries"}
+                  </span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    className={`transition-transform ${countryDropdownOpen ? "rotate-180" : ""}`}>
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                {selectedCountries.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {selectedCountries.map((code) => {
+                      const c = COUNTRIES.find((x) => x.code === code);
+                      return (
+                        <span key={code}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium">
+                          {c ? c.code : code}
+                          <button type="button" onClick={() => toggleCountry(code)}
+                            className="hover:text-red-500 transition-colors leading-none">
+                            &times;
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                {countryDropdownOpen && (
+                  <div className="absolute z-20 mt-1 w-full bg-input-bg border border-card-border rounded-[var(--radius-md)] shadow-lg">
+                    <div className="p-2 border-b border-card-border">
+                      <input
+                        type="text"
+                        value={countrySearch}
+                        onChange={(e) => setCountrySearch(e.target.value)}
+                        placeholder="Search countries..."
+                        className="w-full px-2.5 py-1.5 text-xs rounded border border-card-border bg-input-bg text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20 placeholder:text-text-muted"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-card-border">
+                      <button type="button"
+                        onClick={() => setSelectedCountries(COUNTRIES.map((c) => c.code))}
+                        className="text-[11px] text-primary hover:underline">Select All</button>
+                      <button type="button"
+                        onClick={() => setSelectedCountries([])}
+                        className="text-[11px] text-text-muted hover:text-red-500">Clear All</button>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto p-1">
+                      {filteredCountries.map((c) => (
+                        <label key={c.code}
+                          className="flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-hover-bg cursor-pointer text-xs text-foreground">
+                          <input type="checkbox"
+                            checked={selectedCountries.includes(c.code)}
+                            onChange={() => toggleCountry(c.code)}
+                            className="rounded border-card-border text-primary focus:ring-primary/20" />
+                          <span className="font-medium">{c.code}</span>
+                          <span className="text-text-muted">{c.name}</span>
+                        </label>
+                      ))}
+                      {filteredCountries.length === 0 && (
+                        <p className="text-xs text-text-muted px-2.5 py-2">No countries found</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-text-secondary mb-1">Direction</label>

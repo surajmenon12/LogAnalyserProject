@@ -58,7 +58,7 @@ def generate_cdr_records(
     from_date: str,
     to_date: str,
     *,
-    country: Optional[str] = None,
+    country: Optional[List[str]] = None,
     direction: Optional[str] = None,
     call_state_filter: Optional[str] = None,
     hangup_source: Optional[str] = None,
@@ -156,7 +156,7 @@ def generate_cdr_records(
 
     # Apply filters
     if country:
-        records = [r for r in records if r.country_iso == country]
+        records = [r for r in records if r.country_iso in country]
     if direction:
         records = [r for r in records if r.call_direction == direction]
     if call_state_filter:
@@ -187,7 +187,7 @@ def generate_mdr_records(
     from_date: str,
     to_date: str,
     *,
-    country: Optional[str] = None,
+    country: Optional[List[str]] = None,
     direction: Optional[str] = None,
     message_state_filter: Optional[str] = None,
     message_type_filter: Optional[str] = None,
@@ -260,7 +260,7 @@ def generate_mdr_records(
 
     # Apply filters
     if country:
-        records = [r for r in records if r.country_iso == country]
+        records = [r for r in records if r.country_iso in country]
     if direction:
         records = [r for r in records if r.message_direction == direction]
     if message_state_filter:
@@ -289,7 +289,7 @@ def generate_zentrunk_records(
     from_date: str,
     to_date: str,
     *,
-    country: Optional[str] = None,
+    country: Optional[List[str]] = None,
     direction: Optional[str] = None,
     hangup_cause_filter: Optional[str] = None,
     hangup_initiator: Optional[str] = None,
@@ -384,7 +384,7 @@ def generate_zentrunk_records(
 
     # Apply filters
     if country:
-        records = [r for r in records if r.to_iso == country]
+        records = [r for r in records if r.to_iso in country]
     if direction:
         records = [r for r in records if r.call_direction == direction]
     if hangup_cause_filter:

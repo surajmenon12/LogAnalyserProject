@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field, validator
 
@@ -12,7 +12,7 @@ class TriggerAnalysisRequest(BaseModel):
     log_type: str = Field(..., pattern="^(voice|sms|zentrunk)$", description="Log type: voice, sms, or zentrunk")
 
     # --- Common optional filters ---
-    country: Optional[str] = Field(None, description="Country ISO code (e.g. US, UK, IN)")
+    country: Optional[List[str]] = Field(None, description="Country ISO codes (e.g. ['US', 'UK', 'IN'])")
     direction: Optional[str] = Field(None, description="Traffic direction: inbound or outbound")
     carrier: Optional[str] = Field(None, description="Carrier name or ID filter")
     failed_only: Optional[bool] = Field(False, description="Show only failed records")

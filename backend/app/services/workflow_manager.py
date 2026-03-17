@@ -19,6 +19,7 @@ from app.services.redshift_client import (
     fetch_cdr_records,
     fetch_mdr_records,
     fetch_zentrunk_records,
+    resolve_identifier,
 )
 
 logger = logging.getLogger(__name__)
@@ -142,17 +143,32 @@ async def run_workflow(analysis_id: str) -> None:
         else:
             logger.info("Fetching real data from Redshift")
             try:
+                # Resolve email / auth_id → numeric account_id + hex username
+                resolved = resolve_identifier(
+                    auth_id=state.auth_id or None,
+                    email=state.email or None,
+                )
+                acct_id = resolved["account_id"] or identifier
+                acct_username = resolved.get("username")
+                logger.info(
+                    "Resolved identifier → account_id=%s, username=%s",
+                    acct_id, acct_username,
+                )
+
                 if state.log_type == "voice":
                     records = fetch_cdr_records(
-                        identifier, state.from_date, state.to_date, f,
+                        acct_id, state.from_date, state.to_date, f,
+                        username=acct_username,
                     )
                 elif state.log_type == "zentrunk":
                     records = fetch_zentrunk_records(
-                        identifier, state.from_date, state.to_date, f,
+                        acct_id, state.from_date, state.to_date, f,
+                        username=acct_username,
                     )
                 else:
                     records = fetch_mdr_records(
-                        identifier, state.from_date, state.to_date, f,
+                        acct_id, state.from_date, state.to_date, f,
+                        username=acct_username,
                     )
             except RedshiftError as exc:
                 logger.error("Redshift fetch failed: %s", exc)

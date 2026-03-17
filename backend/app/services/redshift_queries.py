@@ -14,7 +14,7 @@ Tables:
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -116,7 +116,7 @@ def build_mdr_query(
     from_date: str = "",
     to_date: str = "",
     *,
-    country_iso: Optional[str] = None,
+    country_iso: Optional[List[str]] = None,
     direction: Optional[str] = None,
     message_state: Optional[str] = None,
     message_type: Optional[str] = None,
@@ -173,7 +173,8 @@ def build_mdr_query(
 
     # Optional filters
     if country_iso:
-        conditions.append(f"m.country_iso = '{country_iso}'")
+        placeholders = ", ".join(f"'{c}'" for c in country_iso)
+        conditions.append(f"m.country_iso IN ({placeholders})")
     if direction:
         conditions.append(f"m.message_direction = '{direction}'")
     if message_type:
@@ -216,7 +217,7 @@ def build_cdr_query(
     from_date: str = "",
     to_date: str = "",
     *,
-    country_iso: Optional[str] = None,
+    country_iso: Optional[List[str]] = None,
     direction: Optional[str] = None,
     call_state: Optional[str] = None,
     hangup_source: Optional[str] = None,
@@ -260,7 +261,8 @@ def build_cdr_query(
 
     # Optional filters
     if country_iso:
-        conditions.append(f"country_iso = '{country_iso}'")
+        placeholders = ", ".join(f"'{c}'" for c in country_iso)
+        conditions.append(f"country_iso IN ({placeholders})")
     if direction:
         conditions.append(f"call_direction = '{direction}'")
     if carrier_name:
@@ -355,7 +357,8 @@ def build_zentrunk_query(
 
     # Optional filters
     if country_iso:
-        conditions.append(f"to_iso = '{country_iso}'")
+        placeholders = ", ".join(f"'{c}'" for c in country_iso)
+        conditions.append(f"to_iso IN ({placeholders})")
     if direction:
         conditions.append(f"call_direction = '{direction}'")
     if hangup_cause:
@@ -418,7 +421,7 @@ def build_mdr_enriched_query(
     from_date: str = "",
     to_date: str = "",
     *,
-    country_iso: Optional[str] = None,
+    country_iso: Optional[List[str]] = None,
     direction: Optional[str] = None,
     enr_error_code: Optional[int] = None,
     dst_number_type: Optional[str] = None,
@@ -440,7 +443,8 @@ def build_mdr_enriched_query(
         conditions.append(f"message_time <= '{to_date} 23:59:59'")
 
     if country_iso:
-        conditions.append(f"country_iso = '{country_iso}'")
+        placeholders = ", ".join(f"'{c}'" for c in country_iso)
+        conditions.append(f"country_iso IN ({placeholders})")
     if direction:
         conditions.append(f"message_direction = '{direction}'")
     if enr_error_code is not None:

@@ -1,0 +1,353 @@
+{
+  "name": "Plivo Log Analyser — Zendesk Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 🔧 Setup Instructions\n\n**1.** Change the values in the **\"Set Analysis Params\"** node to test with real data\n\n**2.** Replace `http://localhost:8000` in all HTTP Request nodes with your backend URL if deployed\n\n**3.** Click **\"Test Workflow\"** to run manually\n\n**4.** Once working, swap the Manual Trigger for a **Zendesk Trigger** node to automate from tickets\n\n---\n\n**API Endpoints Used:**\n- `POST /api/trigger-analysis` — starts analysis\n- `GET /api/analysis-status/{id}` — polls for results\n- `POST /api/update-zendesk` — posts note to ticket",
+        "height": 434,
+        "width": 370,
+        "color": 4
+      },
+      "id": "b0a0a0a0-0000-0000-0000-000000000001",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-380, 60]
+    },
+    {
+      "parameters": {},
+      "id": "a1a1a1a1-0000-0000-0000-000000000001",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [60, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "auth_id",
+              "value": "YOUR_PLIVO_AUTH_ID",
+              "type": "string"
+            },
+            {
+              "id": "f2",
+              "name": "email",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "f3",
+              "name": "from_date",
+              "value": "2025-03-01",
+              "type": "string"
+            },
+            {
+              "id": "f4",
+              "name": "to_date",
+              "value": "2025-03-15",
+              "type": "string"
+            },
+            {
+              "id": "f5",
+              "name": "log_type",
+              "value": "voice",
+              "type": "string"
+            },
+            {
+              "id": "f6",
+              "name": "failed_only",
+              "value": "false",
+              "type": "boolean"
+            },
+            {
+              "id": "f7",
+              "name": "ticket_id",
+              "value": "12345",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a2a2a2a2-0000-0000-0000-000000000002",
+      "name": "Set Analysis Params",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [280, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/trigger-analysis",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ auth_id: $json.auth_id || undefined, email: $json.email || undefined, from_date: $json.from_date, to_date: $json.to_date, log_type: $json.log_type, failed_only: $json.failed_only || false }) }}",
+        "options": {}
+      },
+      "id": "a3a3a3a3-0000-0000-0000-000000000003",
+      "name": "Start Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "a4a4a4a4-0000-0000-0000-000000000004",
+      "name": "Wait 3 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [760, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://localhost:8000/api/analysis-status/{{ $json.analysis_id }}",
+        "options": {}
+      },
+      "id": "a5a5a5a5-0000-0000-0000-000000000005",
+      "name": "Check Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-done-1",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-done-2",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "failed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        }
+      },
+      "id": "a6a6a6a6-0000-0000-0000-000000000006",
+      "name": "Analysis Done?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-success-1",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a7a7a7a7-0000-0000-0000-000000000007",
+      "name": "Analysis Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format the analysis result into a readable Zendesk internal note\nconst data = $input.first().json;\nconst result = data.result;\n\nif (!result) {\n  return [{ json: { note: 'Analysis completed but returned no result data.', analysis_id: data.analysis_id || 'unknown' } }];\n}\n\nconst sev = { critical: '\\u{1F534}', warning: '\\u{1F7E1}', info: '\\u{1F535}' };\n\nlet note = '## Automated Log Analysis Report\\n\\n';\nnote += '| Metric | Value |\\n|---|---|\\n';\nnote += `| Health Score | **${result.health_score.toFixed(1)}/100** (Grade: **${result.health_grade}**) |\\n`;\nnote += `| Success Rate | ${result.success_rate.toFixed(1)}% |\\n`;\nnote += `| Records Analyzed | ${result.total_records} |\\n`;\nnote += `| Date Range | ${result.date_range} |\\n`;\nnote += `| Log Type | ${result.log_type} |\\n`;\n\nif (result.trend) {\n  note += `| Trend | ${result.trend.direction} (${result.trend.confidence} confidence) |\\n`;\n}\n\nnote += `\\n### AI Summary\\n${result.summary}\\n\\n`;\n\nif (result.issues && result.issues.length > 0) {\n  note += `### Issues Found (${result.issues.length})\\n\\n`;\n  for (const issue of result.issues) {\n    const icon = sev[issue.severity] || '\\u26AA';\n    note += `${icon} **${issue.severity.toUpperCase()}: ${issue.title}**\\n`;\n    note += `> ${issue.description}\\n`;\n    note += `> Affected records: ${issue.affected_records}\\n`;\n    note += `> Recommendation: ${issue.recommendation}\\n\\n`;\n  }\n}\n\nif (result.chart_data && result.chart_data.error_distribution && result.chart_data.error_distribution.length > 0) {\n  note += '### Top Errors\\n\\n';\n  for (const e of result.chart_data.error_distribution.slice(0, 10)) {\n    note += `- **${e.error}**: ${e.count} occurrences\\n`;\n  }\n  note += '\\n';\n}\n\nnote += '---\\n*Generated automatically by Plivo Log Analyser*';\n\nreturn [{\n  json: {\n    note,\n    analysis_id: data.analysis_id,\n    health_score: result.health_score,\n    health_grade: result.health_grade,\n    success_rate: result.success_rate\n  }\n}];"
+      },
+      "id": "a8a8a8a8-0000-0000-0000-000000000008",
+      "name": "Format Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1720, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/update-zendesk",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ticket_id: $('Set Analysis Params').first().json.ticket_id, analysis_id: $json.analysis_id, summary: $json.note }) }}",
+        "options": {}
+      },
+      "id": "a9a9a9a9-0000-0000-0000-000000000009",
+      "name": "Post Report to Zendesk",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1960, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format an error message for failed analyses\nconst data = $input.first().json;\n\nconst note = `## Log Analysis Failed\\n\\n`\n  + `**Status:** ${data.status}\\n`\n  + `**Message:** ${data.message || 'Unknown error'}\\n`\n  + `**Analysis ID:** ${data.analysis_id || 'N/A'}\\n\\n`\n  + `Please run the analysis manually at http://localhost:3000 or contact engineering.\\n\\n`\n  + `---\\n*Generated automatically by Plivo Log Analyser*`;\n\nreturn [{\n  json: {\n    note,\n    analysis_id: data.analysis_id || 'unknown'\n  }\n}];"
+      },
+      "id": "b1b1b1b1-0000-0000-0000-000000000010",
+      "name": "Format Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1720, 440]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/update-zendesk",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ticket_id: $('Set Analysis Params').first().json.ticket_id, analysis_id: $json.analysis_id, summary: $json.note }) }}",
+        "options": {}
+      },
+      "id": "b2b2b2b2-0000-0000-0000-000000000011",
+      "name": "Post Error to Zendesk",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1960, 440]
+    }
+  ],
+  "connections": {
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "Set Analysis Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Analysis Params": {
+      "main": [
+        [
+          {
+            "node": "Start Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Analysis": {
+      "main": [
+        [
+          {
+            "node": "Wait 3 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Check Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status": {
+      "main": [
+        [
+          {
+            "node": "Analysis Done?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analysis Done?": {
+      "main": [
+        [
+          {
+            "node": "Analysis Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 3 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analysis Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Format Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Report": {
+      "main": [
+        [
+          {
+            "node": "Post Report to Zendesk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error": {
+      "main": [
+        [
+          {
+            "node": "Post Error to Zendesk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
